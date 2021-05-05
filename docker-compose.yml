@@ -1,0 +1,49 @@
+version: '2.1'
+
+services:
+  mysql:
+    image: mysql
+    environment:
+      - "MYSQL_ROOT_PASSWORD=password"
+    volumes:
+      - "./mysql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d"
+    networks:
+      - fullcycle
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+  nodejs:
+    image: node:alpine
+    environment:
+      - "MYSQL_HOST=mysql"
+      - "MYSQL_USER=root"
+      - "MYSQL_PASSWORD=password"
+      - "MYSQL_DATABASE=mysql"
+      - "NODE_ENV=production"
+    volumes:
+      - "$PWD:/usr/src/app"
+    working_dir: "/usr/src/app"
+    command: sh -c "npm i && npm start app.js"
+    networks:
+      - fullcycle
+    depends_on:
+      mysql:
+        condition: service_healthy
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - "./nginx/nginx.conf:/etc/nginx/nginx.conf"
+    ports:
+      - "8080:8080"
+    networks:
+      - fullcycle
+    depends_on:
+      - nodejs
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -O /dev/null http://nodejs:5000 || exit 1" ]
+      timeout: 10s
+      retries: 12
+
+networks:
+  fullcycle:
